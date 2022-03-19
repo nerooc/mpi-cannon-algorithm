@@ -1,8 +1,8 @@
-
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /* ---------   Defines    ---------- */
 
@@ -13,7 +13,15 @@
 
 /* ---------    Structures and Consts    ---------- */
 
-
+/*
+ * Structure:  matrix_data 
+ * --------------------
+ * holds matrix values
+ *
+ *  mat: pointer to values of matrix object
+ *  row: numbers of rows in matrix object
+ *  col: numbers of columns in matrix object
+ */
 typedef struct 
 {
     float* mat;
@@ -22,10 +30,30 @@ typedef struct
 } matrix_data;
 
 /* ---------    Function definitions    ---------- */
-void print_matrix(matrix_data mat);
-matrix_data initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
-                        matrix_data mat /*Pointer to mat which have to be initialized */);
 
+/*
+ * Function:  print_matrix 
+ * --------------------
+ * prints out given matrix:
+ *
+ *  mat: Matrix to print out
+ *
+ *  returns: void
+ */
+void print_matrix(matrix_data mat);
+
+/*
+ * Function: initialize_matrix
+ * ----------------------------
+ *   One dimentional matrix created from csv file (comma delivered).
+ *
+ *   file_pointer: Pointer to *.csv file from which will be imported matrix
+ *   matrix_data: Pointer to matrix which have to be filled.
+ *
+ *   returns: Void
+ */
+void initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
+                        matrix_data *mat /*Pointer to mat which have to be initialized */);
 
 
 /* ---------    Function declarations    ---------- */
@@ -33,28 +61,31 @@ matrix_data initialize_matrix(FILE *file_pointer /*Pointer to file containing ma
 
 int main (int argc, char *argv[])
 {
-    int	numtasks,              /* number of tasks in partition */
-        taskid,                /* a task identifier */
-        numworkers,            /* number of worker tasks */
-        source,                /* task id of message source */
-        dest,                  /* task id of message destination */
-        mtype,                 /* message type */
-        rows,                  /* rows of matrix A sent to each worker */
-        averow, extra, offset; /* used to determine rows sent to each worker */
-
+    int	numtasks,
+        id,
+        source,
+        dest,
+        row;
+    float a=0,b=0, c=0;
     MPI_Status status;
 
     matrix_data A,
-                B;
+                B,
+                C;
+
+    FILE* file_pointer;
+
     MPI_Init(&argc,&argv);
-    MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
+    MPI_Comm_rank(MPI_COMM_WORLD,& id);
     MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
-    if (taskid == 0)
+
+
+    /* ---------    Master task    ---------- */
+    if(id == 0)
     {
-        FILE* file_pointer;
         /* ---------    Initialize matrixes    ---------- */
         file_pointer = fopen("A.csv","r");
-        A = initialize_matrix(file_pointer, A);
+        initialize_matrix(file_pointer, &A);
         if(VERBOSE)
         {
             print_matrix(A);
@@ -62,7 +93,7 @@ int main (int argc, char *argv[])
         }
         fclose(file_pointer);
         file_pointer = fopen("B.csv","r");
-        B = initialize_matrix(file_pointer, B);
+        initialize_matrix(file_pointer, &B);
         if(VERBOSE)
         {
             print_matrix(B); 
@@ -71,21 +102,59 @@ int main (int argc, char *argv[])
         fclose(file_pointer);
 
         fflush(stdout);
-
-        // temporary dealocation
-        free(A.mat);
-        free(B.mat);
-        /* TODO: Check if number of processes is equal of number of columns of first matrix */
-
+        row = A.row;
     }
+    
+    MPI_Bcast(&row,1,MPI_INT,0,MPI_COMM_WORLD);
+    
+    int periods[]={1,1}; //both vertical and horizontal movement; 
+    int dims[]={row,row};
+    int coords[2]; /* 2 Dimension topology so 2 coordinates */
+    int right=0, left=0, down=0, up=0;    // neighbor ranks
 
-MPI_Finalize();
+
+    /* ---------    Initialize squared communication topology     ---------- */
+    MPI_Comm comm_2d;
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims,periods, 1, &comm_2d);
+    MPI_Scatter(A.mat, 1, MPI_FLOAT, &a, 1, MPI_FLOAT, 0, comm_2d);
+    MPI_Scatter(B.mat, 1, MPI_FLOAT, &b, 1, MPI_FLOAT, 0, comm_2d);
+
+    /* ---------    redefine id in new topology     ---------- */
+    MPI_Comm_rank(comm_2d, &numtasks);  
+    MPI_Cart_coords(comm_2d, numtasks, 2, coords);
+
+    MPI_Cart_shift(comm_2d, 1, coords[0], &left,&right);
+    MPI_Cart_shift(comm_2d, 0, coords[1], &up,&down);
+    MPI_Sendrecv_replace(&a, 1, MPI_FLOAT, left, 0, right, 0, comm_2d, MPI_STATUS_IGNORE);
+    MPI_Sendrecv_replace(&b, 1, MPI_FLOAT, up, 0, down, 0, comm_2d, MPI_STATUS_IGNORE);
+    c += a * b;
+    for(int i = 1; i < row; i++)
+    {
+        MPI_Cart_shift(comm_2d, 1, 1, &left, &right);
+        MPI_Cart_shift(comm_2d, 0, 1, &up, &down);
+        MPI_Sendrecv_replace(&a, 1, MPI_FLOAT, left, 0, right, 0, comm_2d, MPI_STATUS_IGNORE);
+        MPI_Sendrecv_replace(&b, 1, MPI_FLOAT, up, 0, down, 0, comm_2d, MPI_STATUS_IGNORE);
+        c += a * b;
+    }
+    C.mat = (float*)calloc(sizeof(float), A.row * B.col);
+    C.row = A.row;
+    C.col = B.col;
+    MPI_Gather(&c, 1, MPI_FLOAT, C.mat, 1, MPI_FLOAT, 0, comm_2d);
+
+    if( id == 0)
+    {
+        print_matrix(C);
+    }
+    // TODO: Add saving matrix to csv
+    MPI_Comm_free(&comm_2d); 
+    free(C.mat);
+    free(A.mat);
+    free(B.mat);
+    MPI_Finalize();
 }
 
-
-
-matrix_data initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
-                        matrix_data mat /*Pointer to mat which have to be initialized */)
+void initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
+                        matrix_data *mat /*Pointer to mat which have to be initialized */)
 {
     char buffer[1024];
     float n;
@@ -115,7 +184,7 @@ matrix_data initialize_matrix(FILE *file_pointer /*Pointer to file containing ma
 
     fseek(file_pointer, 0, SEEK_SET);
 
-    mat.mat = (float *)malloc(sizeof(float) * row * col);
+    mat->mat = (float *)malloc(sizeof(float) * row * col);
 
     int k=0;
     int i = 0;
@@ -125,14 +194,13 @@ matrix_data initialize_matrix(FILE *file_pointer /*Pointer to file containing ma
         int j = 0;
         while(record != NULL && j++ < col)
         {
-            mat.mat[k] = atof(record);
+            mat->mat[k] = atof(record);
             record = strtok(NULL,",");
             k++;
         }
     }
-    mat.col = col;
-    mat.row = row;
-    return mat;
+    mat->col = col;
+    mat->row = row;
 }
 
 void print_matrix(matrix_data mat)
