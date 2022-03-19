@@ -1,0 +1,31 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        // Build task
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "source /opt/nfs/config/source_mpich32.sh && mpicc main.c -o main",
+            "args": [],
+            "group": "build",
+        },
+        // Run task
+        {
+            "label": "run",
+            "type": "shell",
+            "command": "source /opt/nfs/config/source_mpich32.sh && mpiexec -f nodes -n $(( 2 * $(cat nodes | wc -l) )) ./main",
+            "args": [],
+            "group": "build",
+        },
+        // Run task
+        {
+            "label": "run on one computer",
+            "type": "shell",
+            "command": "source /opt/nfs/config/source_mpich32.sh && mpiexec -n 16 ./main",
+            "args": [],
+            "group": "build",
+        },
+    ]
+}
