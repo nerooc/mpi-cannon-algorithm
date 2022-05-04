@@ -3,13 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 
 /* ---------   Defines    ---------- */
 
 // Variable to print logs 
 // 0: logs invisible
 // 1: logs visible
-#define VERBOSE 0
+bool VERBOSE = 0;
 
 /* ---------    Structures and Consts    ---------- */
 
@@ -52,8 +53,21 @@ void print_matrix(matrix_data mat);
  *
  *   returns: Void
  */
-void initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
-                        matrix_data *mat /*Pointer to mat which have to be initialized */);
+void initialize_matrix(FILE *file_pointer,
+                       matrix_data *mat);
+
+/*
+ * Function:  save_matrix 
+ * --------------------
+ * saves matrix:
+ *
+ *  file_pointer: Pointer to *.csv file from which will be imported matrix
+ *  mat: Matrix to print out
+ *
+ *  returns: void
+ */
+void save_matrix(FILE *file_pointer,
+                 matrix_data mat);
 
 
 /* ---------    Function declarations    ---------- */
@@ -75,6 +89,13 @@ int main (int argc, char *argv[])
 
     FILE* file_pointer;
 
+    // ---------    Set verbose    --------- */
+    if(argc > 1 && strcmp(argv[1],"-v") == 0)
+    {
+        VERBOSE = 1;
+    }
+
+
     MPI_Init(&argc,&argv);
     MPI_Comm_rank(MPI_COMM_WORLD,& id);
     MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
@@ -88,16 +109,18 @@ int main (int argc, char *argv[])
         initialize_matrix(file_pointer, &A);
         if(VERBOSE)
         {
+            fprintf(stdout, "Matrix A: \n");
             print_matrix(A);
-            fprintf(stdout, "rows: %d , cols: %d",A.row,  A.col);
+            fprintf(stdout, "rows: %d , cols: %d \n",A.row,  A.col);
         }
         fclose(file_pointer);
         file_pointer = fopen("B.csv","r");
         initialize_matrix(file_pointer, &B);
         if(VERBOSE)
         {
+            fprintf(stdout, "Matrix B: \n");
             print_matrix(B); 
-            fprintf(stdout, "rows: %d , cols: %d",B.row,  B.col);
+            fprintf(stdout, "rows: %d , cols: %d \n",B.row,  B.col);
         }
         fclose(file_pointer);
 
@@ -143,9 +166,17 @@ int main (int argc, char *argv[])
 
     if( id == 0)
     {
-        print_matrix(C);
+        if(VERBOSE)
+        {
+            fprintf(stdout, "Output matrix: \n");
+            print_matrix(C);
+        }
+        file_pointer = fopen("C.csv","w");
+        save_matrix(file_pointer, C);
+        fclose(file_pointer);
+
     }
-    // TODO: Add saving matrix to csv
+
     MPI_Comm_free(&comm_2d); 
     free(C.mat);
     free(A.mat);
@@ -153,8 +184,8 @@ int main (int argc, char *argv[])
     MPI_Finalize();
 }
 
-void initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
-                        matrix_data *mat /*Pointer to mat which have to be initialized */)
+void initialize_matrix(FILE *file_pointer,
+                        matrix_data *mat)
 {
     char buffer[1024];
     float n;
@@ -176,10 +207,6 @@ void initialize_matrix(FILE *file_pointer /*Pointer to file containing matrix*/,
             }  
         }
         row++;
-    }
-    if(VERBOSE)
-    {
-        fprintf(stdout, "rows: %d , cols: %d \n",row,  col);	
     }
 
     fseek(file_pointer, 0, SEEK_SET);
@@ -210,9 +237,34 @@ void print_matrix(matrix_data mat)
     {
         for(int j = 0; j < mat.col; j++)
         {
-            fprintf(stdout, "%1.2f\t", mat.mat[cnt]);
+            if(VERBOSE)
+            {
+                fprintf(stdout, "%1.2f\t", mat.mat[cnt]);
+            }
             cnt++; 
         }
-        fprintf(stdout, "\n");
+        if(VERBOSE)
+        {
+            fprintf(stdout, "\n");
+        }
+    }
+}
+
+void save_matrix(FILE *file_pointer,
+                 matrix_data mat)
+{
+    int cnt = 0;
+    if(VERBOSE)
+    {
+        fprintf(stdout, "Saving matrix to output file.\n");
+    }
+    for(int i = 0; i < mat.row; i++) 
+    {
+        for(int j = 0; j < mat.col; j++)
+        {
+            fprintf(file_pointer, "%1.2f,", mat.mat[cnt]);
+            cnt++; 
+        }
+        fprintf(file_pointer, "\n");
     }
 }
