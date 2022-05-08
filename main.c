@@ -104,7 +104,7 @@ int main (int argc, char *argv[])
     /* ---------    Master task    ---------- */
     if(id == 0)
     {
-        /* ---------    Initialize matrixes    ---------- */
+        /* ---------    Initialize matrices    ---------- */
         file_pointer = fopen("A.csv","r");
         initialize_matrix(file_pointer, &A);
         if(VERBOSE)
