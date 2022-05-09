@@ -77,11 +77,8 @@ int main (int argc, char *argv[])
 {
     int	numtasks,
         id,
-        source,
-        dest,
         row;
     float a=0,b=0, c=0;
-    MPI_Status status;
 
     matrix_data A,
                 B,
@@ -96,9 +93,9 @@ int main (int argc, char *argv[])
     }
 
 
-    MPI_Init(&argc,&argv);
-    MPI_Comm_rank(MPI_COMM_WORLD,& id);
-    MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &id);
+    MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 
 
     /* ---------    Master task    ---------- */
@@ -138,7 +135,8 @@ int main (int argc, char *argv[])
 
     /* ---------    Initialize squared communication topology     ---------- */
     MPI_Comm comm_2d;
-    MPI_Cart_create(MPI_COMM_WORLD, 2, dims,periods, 1, &comm_2d);
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &comm_2d);
+
     MPI_Scatter(A.mat, 1, MPI_FLOAT, &a, 1, MPI_FLOAT, 0, comm_2d);
     MPI_Scatter(B.mat, 1, MPI_FLOAT, &b, 1, MPI_FLOAT, 0, comm_2d);
 
@@ -147,8 +145,8 @@ int main (int argc, char *argv[])
     MPI_Cart_coords(comm_2d, numtasks, 2, coords);
 
     MPI_Cart_shift(comm_2d, 1, coords[0], &left,&right);
-    MPI_Cart_shift(comm_2d, 0, coords[1], &up,&down);
     MPI_Sendrecv_replace(&a, 1, MPI_FLOAT, left, 0, right, 0, comm_2d, MPI_STATUS_IGNORE);
+    MPI_Cart_shift(comm_2d, 0, coords[1], &up,&down);
     MPI_Sendrecv_replace(&b, 1, MPI_FLOAT, up, 0, down, 0, comm_2d, MPI_STATUS_IGNORE);
     c += a * b;
     for(int i = 1; i < row; i++)
@@ -188,8 +186,6 @@ void initialize_matrix(FILE *file_pointer,
                         matrix_data *mat)
 {
     char buffer[1024];
-    float n;
-    char ch;
     char *line,
          *record;
     int row = 0,
