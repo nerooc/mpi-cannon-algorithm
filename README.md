@@ -19,10 +19,7 @@ Algorytm Cannon’a jest rozproszonym algorytmem mnożenia macierzy dla siatek d
 7. Wykonujemy mnożenie kolejnych bloków, dodajemy do wyniku częściowego i powtarzamy to, aż wszystkie bloki zostaną pomnożone.
 
 ### Przykład obliczania jednego z elementów macierzy wynikowej
-![image](https://user-images.githubusercontent.com/31045802/167599690-94ac586a-1236-48fc-bd21-576b1f1d1a93.png)
-
-
-**Source**: OpenGenusIQ
+<img width="731" alt="Screenshot 2022-05-10 at 12 50 43" src="https://user-images.githubusercontent.com/31045802/167612439-32d8979b-89a7-4d0d-9857-b9f89e1cd791.png">
 
 ## 2. Implementacja
 Program został napisany w języku C. 
