@@ -177,8 +177,6 @@ int main (int argc, char *argv[])
 
     MPI_Comm_free(&comm_2d); 
     free(C.mat);
-    free(A.mat);
-    free(B.mat);
     MPI_Finalize();
 }
 
