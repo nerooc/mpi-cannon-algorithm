@@ -1,5 +1,5 @@
 Gabriel Chęć, Tomasz Gajda
-# Mnożenie macierzy
+# Mnożenie macierzy (MPI)
 ### Algorytm Cannon'a 
 
 ## 1. Wstęp teoretyczny
